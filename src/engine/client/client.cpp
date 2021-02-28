@@ -496,7 +496,7 @@ void CClient::OnEnterGame()
 	m_PrevGameTick = 0;
 	m_CurMenuTick = 0;
 
-	CV8Test *pTestV8 = new CV8Test();
+	CV8Test *pTestV8 = new CV8Test(GameClient());
 	delete pTestV8;
 }
 
