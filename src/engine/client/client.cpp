@@ -44,8 +44,6 @@
 #include "serverbrowser.h"
 #include "client.h"
 
-#include "v8test.h"
-
 #if defined(CONF_FAMILY_WINDOWS)
 	#define WIN32_LEAN_AND_MEAN
 	#include <windows.h>
@@ -239,7 +237,6 @@ void CSmoothTime::Update(CGraph *pGraph, int64 Target, int TimeLeft, int AdjustD
 
 CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotDelta)
 {
-	dbg_msg("dasdas", "dasdasdadsda");
 	m_pEditor = 0;
 	m_pInput = 0;
 	m_pGraphics = 0;
@@ -495,9 +492,6 @@ void CClient::OnEnterGame()
 	m_CurGameTick = 0;
 	m_PrevGameTick = 0;
 	m_CurMenuTick = 0;
-
-	CV8Test *pTestV8 = new CV8Test(GameClient());
-	delete pTestV8;
 }
 
 void CClient::EnterGame()
@@ -1998,6 +1992,9 @@ void CClient::Run()
 
 	// init the input
 	Input()->Init();
+
+	// init v8
+	m_pV8 = new CV8Engine(GameClient());
 
 	// start refreshing addresses while we load
 	MasterServer()->RefreshAddresses(m_ContactClient.NetType());

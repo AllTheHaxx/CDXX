@@ -5,6 +5,8 @@
 
 #include <base/hash.h>
 
+#include "v8engine.h"
+
 class CGraph
 {
 	enum
@@ -67,6 +69,8 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	IConsole *m_pConsole;
 	IStorage *m_pStorage;
 	IEngineMasterServer *m_pMasterServer;
+
+	CV8Engine *m_pV8;
 
 	enum
 	{

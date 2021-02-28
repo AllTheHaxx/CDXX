@@ -1438,8 +1438,8 @@ if(CLIENT)
     sound.h
     textrender.cpp
     textrender.h
-    v8test.cpp
-    v8test.h
+    v8engine.cpp
+    v8engine.h
   )
   set_src(GAME_CLIENT GLOB_RECURSE src/game/client
     animstate.cpp
