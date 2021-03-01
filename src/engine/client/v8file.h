@@ -1,17 +1,17 @@
-#ifndef ENGINE_CLIENT_V8ENGINE_H
-#define ENGINE_CLIENT_V8ENGINE_H
+#ifndef ENGINE_CLIENT_V8FILE_H
+#define ENGINE_CLIENT_V8FILE_H
 
 #include <v8.h>
 
 #include <game/client/gameclient.h>
 
-class CV8Engine
+class CV8File
 {
 public:
-	CV8Engine(IGameClient *pClient);
-    ~CV8Engine();
+	CV8File(v8::Isolate *pIsolate, const char *pFilename);
+    ~CV8File();
 
-	static const char* ToCString(const v8::String::Utf8Value& Str);
+    void Run();
 private:
     v8::Isolate *m_pIsolate;
 	v8::MaybeLocal<v8::String> ReadFile(const char *name);
