@@ -1438,6 +1438,10 @@ if(CLIENT)
     sound.h
     textrender.cpp
     textrender.h
+  )
+  set_src(ENGINE_CLIENT_V8 GLOB src/engine/client/v8
+    jsfile.cpp
+    jsfile.h
     v8engine.cpp
     v8engine.h
   )
@@ -1539,7 +1543,7 @@ if(CLIENT)
     src/generated/client_data.cpp
     src/generated/client_data.h
   )
-  set(CLIENT_SRC ${PLATFORM_CLIENT} ${ENGINE_CLIENT} ${GAME_CLIENT} ${GAME_EDITOR} ${GAME_GENERATED_CLIENT})
+  set(CLIENT_SRC ${PLATFORM_CLIENT} ${ENGINE_CLIENT} ${ENGINE_CLIENT_V8} ${GAME_CLIENT} ${GAME_EDITOR} ${GAME_GENERATED_CLIENT})
 
   set(DEPS_CLIENT ${DEPS} ${PNGLITE_DEP} ${WAVPACK_DEP})
 

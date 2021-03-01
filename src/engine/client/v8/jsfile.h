@@ -5,11 +5,11 @@
 
 #include <game/client/gameclient.h>
 
-class CV8File
+class CJSFile
 {
 public:
-	CV8File(v8::Isolate *pIsolate, const char *pFilename);
-    ~CV8File();
+	CJSFile(v8::Isolate *pIsolate, const char *pFilename);
+    ~CJSFile();
 
     void Run();
 private:

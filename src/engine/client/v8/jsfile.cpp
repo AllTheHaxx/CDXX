@@ -1,11 +1,11 @@
-#include "v8file.h"
+#include "jsfile.h"
 
-CV8File::CV8File(v8::Isolate *pIsolate)
+CJSFile::CJSFile(v8::Isolate *pIsolate)
 {
     m_pIsolate = pIsolate;
 }
 
-v8::MaybeLocal<v8::String> CV8File::ReadFile(const char *name) { // maybe do this with tw's io? (keeping this c style for now xd)
+v8::MaybeLocal<v8::String> CJSFile::ReadFile(const char *name) { // maybe do this with tw's io? (keeping this c style for now xd)
 	FILE* file = fopen(name, "rb");
 	if(file == NULL)
 		return v8::MaybeLocal<v8::String>();
@@ -30,7 +30,7 @@ v8::MaybeLocal<v8::String> CV8File::ReadFile(const char *name) { // maybe do thi
 	return result;
 }
 
-bool CV8File::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value> Name, bool PrintResult)
+bool CJSFile::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value> Name, bool PrintResult)
 {
 	v8::HandleScope HandleScope(m_pIsolate);
 	v8::TryCatch TryCatch(m_pIsolate);
@@ -63,7 +63,7 @@ bool CV8File::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value> N
 	}
 }
 
-void CV8File::ReportException(v8::TryCatch* TryCatch) {
+void CJSFile::ReportException(v8::TryCatch* TryCatch) {
 	v8::HandleScope HandleScope(m_pIsolate);
 	v8::String::Utf8Value Exception(m_pIsolate, TryCatch->Exception());
 	const char *pExceptionString = ToCString(Exception);
