@@ -1,8 +1,24 @@
 #include "jsfile.h"
 
-CJSFile::CJSFile(v8::Isolate *pIsolate)
+#include <libplatform/libplatform.h>
+
+CJSFile::CJSFile(v8::Isolate *pIsolate, const char *pFileName)
 {
     m_pIsolate = pIsolate;
+	str_copy(m_aFileName, pFileName, sizeof(m_aFileName));
+}
+
+void CJSFile::Run()
+{
+	v8::Local<v8::String> FileName = v8::String::NewFromUtf8(m_pIsolate, m_aFileName).ToLocalChecked();
+	v8::Local<v8::String> Source;
+	if(!ReadFile(m_aFileName).ToLocal(&Source))
+		dbg_msg("v8test", "Error reading '%s'", m_aFileName);
+
+	bool success = ExecuteString(Source, FileName, true);
+
+	//while(v8::platform::PumpMessageLoop(Platform.get(), m_pIsolate))
+	//	continue;
 }
 
 v8::MaybeLocal<v8::String> CJSFile::ReadFile(const char *name) { // maybe do this with tw's io? (keeping this c style for now xd)
@@ -109,4 +125,8 @@ void CJSFile::ReportException(v8::TryCatch* TryCatch) {
 			dbg_msg("v8test", "%s", pStackTraceStr);
 		}
 	}
+}
+
+const char* CJSFile::ToCString(const v8::String::Utf8Value& Str) {
+    return *Str ? *Str : "<string conversion failed>";
 }

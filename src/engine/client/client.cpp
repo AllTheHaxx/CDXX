@@ -1995,6 +1995,7 @@ void CClient::Run()
 
 	// init v8
 	m_pV8 = new CV8Engine(GameClient());
+	m_pV8->Init();
 
 	// start refreshing addresses while we load
 	MasterServer()->RefreshAddresses(m_ContactClient.NetType());

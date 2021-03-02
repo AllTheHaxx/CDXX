@@ -8,7 +8,7 @@
 class CJSFile
 {
 public:
-	CJSFile(v8::Isolate *pIsolate, const char *pFilename);
+	CJSFile(v8::Isolate *pIsolate, const char *pFileName);
     ~CJSFile();
 
     void Run();
@@ -18,7 +18,9 @@ private:
 	bool ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value> Name, bool PrintResult);
 	void ReportException(v8::TryCatch *pTryCatch);
 
-	static CGameClient * m_pCGameClient;
+	char m_aFileName[512];
+
+	const char* ToCString(const v8::String::Utf8Value& Str); // move at some point
 };
 
 #endif
