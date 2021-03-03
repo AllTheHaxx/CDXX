@@ -10,6 +10,7 @@ CJSFile::CJSFile(v8::Isolate *pIsolate, const char *pFileName)
 
 void CJSFile::Run()
 {
+	v8::HandleScope HandleScope(m_pIsolate);
 	v8::Local<v8::String> FileName = v8::String::NewFromUtf8(m_pIsolate, m_aFileName).ToLocalChecked();
 	v8::Local<v8::String> Source;
 	if(!ReadFile(m_aFileName).ToLocal(&Source))
@@ -84,7 +85,7 @@ void CJSFile::ReportException(v8::TryCatch* TryCatch) {
 	v8::String::Utf8Value Exception(m_pIsolate, TryCatch->Exception());
 	const char *pExceptionString = ToCString(Exception);
 	v8::Local<v8::Message> Message = TryCatch->Message();
-	if (Message.IsEmpty())
+	if(Message.IsEmpty())
 	{
 		// no extra information, just print the exception
 		dbg_msg("v8test", "%s\n", pExceptionString);
@@ -97,7 +98,7 @@ void CJSFile::ReportException(v8::TryCatch* TryCatch) {
 		const char *pFilenameStr = ToCString(Filename);
 		int LineNum = Message->GetLineNumber(Context).FromJust();
 		dbg_msg("v8test", "%s:%i: %s", pFilenameStr, LineNum, pExceptionString);
-		
+
 		// line
 		v8::String::Utf8Value Sourceline(m_pIsolate, Message->GetSourceLine(Context).ToLocalChecked());
 		const char *pSourceLine = ToCString(Sourceline);
@@ -113,7 +114,7 @@ void CJSFile::ReportException(v8::TryCatch* TryCatch) {
 			str_append(aUnderlining, "^", sizeof(aUnderlining));
 		
 		dbg_msg("v8test", "%s", aUnderlining);
-		
+
 		// stack trace
 		v8::Local<v8::Value> StackTrace;
 		if(TryCatch->StackTrace(Context).ToLocal(&StackTrace) &&

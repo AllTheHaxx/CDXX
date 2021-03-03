@@ -23,9 +23,10 @@ public:
 private:
     v8::Isolate *m_pIsolate;
 
+	void RegisterBindings(); // rename and move
 	void LoadFiles();
+	
 	CJSFile *m_apJSFiles[MAX_JS_FILES]; // vector?
-
 	static CGameClient *m_pCGameClient;
 };
 
