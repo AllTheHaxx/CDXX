@@ -36,6 +36,7 @@ void CV8Engine::ThreadFunc(void *pUser)
 	v8::Isolate::CreateParams create_params;
 	create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
 	pThis->m_pIsolate = v8::Isolate::New(create_params);
+	v8::Locker(pThis->m_pIsolate);
 	{
 		// create a stack-allocated handle scope
 		v8::HandleScope HandleScope(pThis->m_pIsolate);
