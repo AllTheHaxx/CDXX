@@ -10,6 +10,8 @@ class CV8Engine
 public:
 	CV8Engine(IGameClient *pClient);
     ~CV8Engine();
+
+	static void ThreadFunc(void *pUser);
 private:
     v8::Isolate *m_pIsolate;
 	v8::MaybeLocal<v8::String> ReadFile(const char *name);
