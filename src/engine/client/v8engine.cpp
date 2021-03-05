@@ -39,10 +39,13 @@ void CV8Engine::ThreadFunc(void *pUser)
 	v8::Locker(pThis->m_pIsolate);
 	{
 		// create a stack-allocated handle scope
+
 		v8::HandleScope HandleScope(pThis->m_pIsolate);
+
 		v8::Local<v8::Context> Context = v8::Context::New(pThis->m_pIsolate);
 		// enter the Context for compiling and running the hello world script
 		v8::Context::Scope ContextScope(Context);
+
 
 		// bindings
 		v8pp::module Game(pThis->m_pIsolate), GameConsole(pThis->m_pIsolate);
@@ -61,12 +64,15 @@ void CV8Engine::ThreadFunc(void *pUser)
 		const char *pFileName = "benchmark.js";
 		v8::Local<v8::String> FileName = v8::String::NewFromUtf8(pThis->m_pIsolate, pFileName).ToLocalChecked();
 		v8::Local<v8::String> Source;
-		if(!pThis->ReadFile(pFileName).ToLocal(&Source))
+
+		if(!pThis->ReadFile(Platform.get(), pFileName).ToLocal(&Source))
 			dbg_msg("v8test", "Error reading '%s'", pFileName);
 
-		bool success = pThis->ExecuteString(Source, FileName, true);
+		bool success = pThis->ExecuteString(Platform.get(), Source, FileName, true);
+
 		while(v8::platform::PumpMessageLoop(Platform.get(), pThis->m_pIsolate))
 			continue;
+
 	}
 
 	delete create_params.array_buffer_allocator;
@@ -80,7 +86,8 @@ CV8Engine::~CV8Engine()
 	v8::V8::ShutdownPlatform();
 }
 
-v8::MaybeLocal<v8::String> CV8Engine::ReadFile(const char *name) { // maybe do this with tw's io? (keeping this c style for now xd)
+v8::MaybeLocal<v8::String> CV8Engine::ReadFile(v8::Platform *pPlatform, const char *name) { // maybe do this with tw's io? (keeping this c style for now xd)
+	v8::Locker Locker(m_pIsolate);
 	FILE* file = fopen(name, "rb");
 	if(file == NULL)
 		return v8::MaybeLocal<v8::String>();
@@ -105,8 +112,9 @@ v8::MaybeLocal<v8::String> CV8Engine::ReadFile(const char *name) { // maybe do t
 	return result;
 }
 
-bool CV8Engine::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value> Name, bool PrintResult)
+bool CV8Engine::ExecuteString(v8::Platform *pPlatform, v8::Local<v8::String> Source, v8::Local<v8::Value> Name, bool PrintResult)
 {
+	v8::Locker Locker(m_pIsolate);
 	v8::HandleScope HandleScope(m_pIsolate);
 	v8::TryCatch TryCatch(m_pIsolate);
 	v8::ScriptOrigin Origin(Name);
@@ -114,7 +122,7 @@ bool CV8Engine::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value>
 	v8::Local<v8::Script> Script;
 	if(!v8::Script::Compile(Context, Source, &Origin).ToLocal(&Script))
 	{
-		ReportException(&TryCatch);
+		ReportException(pPlatform, &TryCatch);
 		return false;
 	}
 	else
@@ -122,13 +130,15 @@ bool CV8Engine::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value>
 		v8::Local<v8::Value> Result;
 		if(!Script->Run(Context).ToLocal(&Result))
 		{
-			ReportException(&TryCatch);
+			ReportException(pPlatform, &TryCatch);
 			return false;
 		}
 		else
 		{
+
 			if(PrintResult && !Result->IsUndefined())
 			{
+
 				v8::String::Utf8Value StrV8(m_pIsolate, Result);
 				const char* pStr = ToCString(StrV8);
 				dbg_msg("v8test", "%s", pStr);
@@ -138,7 +148,8 @@ bool CV8Engine::ExecuteString(v8::Local<v8::String> Source, v8::Local<v8::Value>
 	}
 }
 
-void CV8Engine::ReportException(v8::TryCatch* TryCatch) {
+void CV8Engine::ReportException(v8::Platform *pPlatform, v8::TryCatch* TryCatch) {
+	v8::Locker Locker(m_pIsolate);
 	v8::HandleScope HandleScope(m_pIsolate);
 	v8::String::Utf8Value Exception(m_pIsolate, TryCatch->Exception());
 	const char *pExceptionString = ToCString(Exception);
