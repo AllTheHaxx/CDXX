@@ -70,7 +70,7 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	IStorage *m_pStorage;
 	IEngineMasterServer *m_pMasterServer;
 
-	CV8Engine *m_pV8;
+	CV8Engine *m_apV8[64];
 
 	enum
 	{

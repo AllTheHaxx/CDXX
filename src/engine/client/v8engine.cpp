@@ -50,7 +50,7 @@ CV8Engine::CV8Engine(IGameClient *pClient)
 		m_pIsolate->GetCurrentContext()->Global()->Set(Context, v8pp::to_v8(m_pIsolate, "game"), Game.new_instance());
 
 
-		const char *pFileName = "test.js";
+		const char *pFileName = "benchmark.js";
 		v8::Local<v8::String> FileName = v8::String::NewFromUtf8(m_pIsolate, pFileName).ToLocalChecked();
 		v8::Local<v8::String> Source;
 		if(!ReadFile(pFileName).ToLocal(&Source))

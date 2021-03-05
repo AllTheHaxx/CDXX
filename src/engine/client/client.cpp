@@ -1994,7 +1994,8 @@ void CClient::Run()
 	Input()->Init();
 
 	// init v8
-	m_pV8 = new CV8Engine(GameClient());
+	for(int i = 0; i < 64; i++)
+		m_apV8[i] = new CV8Engine(GameClient());
 
 	// start refreshing addresses while we load
 	MasterServer()->RefreshAddresses(m_ContactClient.NetType());
