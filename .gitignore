@@ -32,9 +32,11 @@ map_version*
 mastersrv*
 packetgen*
 teeworlds*
+!other/bash-completion/teeworlds
 !teeworlds.manifest
 !teeworlds.rc
 teeworlds_srv*
+!other/bash-completion/teeworlds_srv
 testrunner
 versionsrv*
 

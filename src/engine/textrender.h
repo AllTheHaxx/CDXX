@@ -100,14 +100,14 @@ class CTextCursor
 			Box.x = -m_Width / 2.0f;
 		else
 			Box.x = 0.0f;
-		
+
 		if((m_Align & TEXTALIGN_MASK_VERT) == TEXTALIGN_BOTTOM)
 			Box.y = -m_Height;
 		else if((m_Align & TEXTALIGN_MASK_VERT) == TEXTALIGN_MIDDLE)
 			Box.y = -m_Height / 2.0f;
 		else
 			Box.y = 0.0f;
-	
+
 		Box.w = m_Width;
 		Box.h = m_Height;
 		return Box;
@@ -135,9 +135,10 @@ public:
 
 	void Reset(int64 StringVersion = -1)
 	{
-		if (StringVersion < 0 || m_StringVersion != StringVersion)
+		if(StringVersion < 0 || m_StringVersion != StringVersion)
 		{
 			m_Width = 0;
+			m_Height = 0;
 			m_NextLineAdvanceY = 0;
 			m_Advance = vec2(0, 0);
 			m_LineCount = 1;
@@ -191,9 +192,9 @@ public:
 	virtual void LoadFonts(IStorage *pStorage, IConsole *pConsole) = 0;
 	virtual void SetFontLanguageVariant(const char *pLanguageFile) = 0;
 
-	virtual void TextColor(float r, float g, float b, float a) = 0;
-	virtual void TextSecondaryColor(float r, float g, float b, float a) = 0;
-	
+	inline void TextColor(float r, float g, float b, float a) { TextColor(vec4(r, g, b, a)); }
+	inline void TextSecondaryColor(float r, float g, float b, float a) { TextSecondaryColor(vec4(r, g, b, a)); }
+
 	virtual float TextWidth(float FontSize, const char *pText, int Length) = 0;
 	virtual void TextDeferred(CTextCursor *pCursor, const char *pText, int Length) = 0;
 	virtual void TextNewline(CTextCursor *pCursor) = 0;
@@ -202,8 +203,8 @@ public:
 	virtual void TextOutlined(CTextCursor *pCursor, const char *pText, int Length) = 0;
 	virtual void TextShadowed(CTextCursor *pCursor, const char *pText, int Length, vec2 ShadowOffset) = 0;
 
-	inline void TextColor(const vec4 &Color) { TextColor(Color.r, Color.g, Color.b, Color.a); }
-	inline void TextSecondaryColor(const vec4 &Color) { TextSecondaryColor(Color.r, Color.g, Color.b, Color.a); }
+	virtual void TextColor(const vec4 &Color) = 0;
+	virtual void TextSecondaryColor(const vec4 &Color) = 0;
 
 	virtual vec4 GetColor() const = 0;
 	virtual vec4 GetSecondaryColor() const = 0;
@@ -215,6 +216,7 @@ public:
 	virtual void DrawTextShadowed(CTextCursor *pCursor, vec2 ShadowOffset, float Alpha = 1.0f, int StartGlyph = 0, int NumGlyphs = -1) = 0;
 
 	// QoL APIs
+	virtual int CharToGlyph(CTextCursor *pCursor, int NumChars, float *pLineWidth = 0) = 0;
 	virtual vec2 CaretPosition(CTextCursor *pCursor, int NumChars) = 0;
 };
 

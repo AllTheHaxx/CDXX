@@ -243,6 +243,7 @@ CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotD
 	m_pSound = 0;
 	m_pGameClient = 0;
 	m_pMap = 0;
+	m_pMapChecker = 0;
 	m_pConfigManager = 0;
 	m_pConfig = 0;
 	m_pConsole = 0;
@@ -491,7 +492,6 @@ void CClient::OnEnterGame()
 	m_CurrentRecvTick = 0;
 	m_CurGameTick = 0;
 	m_PrevGameTick = 0;
-	m_CurMenuTick = 0;
 }
 
 void CClient::EnterGame()
@@ -541,9 +541,8 @@ void CClient::Connect(const char *pAddress)
 
 	if(net_addr_from_str(&m_ServerAddress, m_aServerAddressStr) != 0 && net_host_lookup(m_aServerAddressStr, &m_ServerAddress, m_NetClient.NetType()) != 0)
 	{
-		char aBufMsg[256];
-		str_format(aBufMsg, sizeof(aBufMsg), "could not find the address of %s, connecting to localhost", aBuf);
-		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBufMsg);
+		str_format(aBuf, sizeof(aBuf), "could not find the address of %s, connecting to localhost", m_aServerAddressStr);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBuf);
 		net_host_lookup("localhost", &m_ServerAddress, m_NetClient.NetType());
 	}
 
@@ -554,8 +553,7 @@ void CClient::Connect(const char *pAddress)
 	m_NetClient.Connect(&m_ServerAddress);
 	SetState(IClient::STATE_CONNECTING);
 
-	if(m_DemoRecorder.IsRecording())
-		DemoRecorder_Stop();
+	DemoRecorder_Stop();
 
 	m_InputtimeMarginGraph.Init(-150.0f, 150.0f);
 	m_GametimeMarginGraph.Init(-150.0f, 150.0f);
@@ -583,6 +581,7 @@ void CClient::DisconnectWithReason(const char *pReason)
 	m_RconAuthed = 0;
 	m_UseTempRconCommands = 0;
 	m_pConsole->DeregisterTempAll();
+	m_pConsole->DeregisterTempMapAll();
 	m_NetClient.Disconnect(pReason);
 	SetState(IClient::STATE_OFFLINE);
 	m_pMap->Unload();
@@ -907,7 +906,7 @@ const char *CClient::LoadMapSearch(const char *pMapName, const SHA256_DIGEST *pW
 	if(pWantedSha256)
 	{
 		FormatMapDownloadFilename(pMapName, 0, WantedCrc, false, aBuf, sizeof(aBuf));
-		pError = LoadMap(pMapName, aBuf, 0, WantedCrc);
+		pError = LoadMap(pMapName, aBuf, pWantedSha256, WantedCrc);
 		if(!pError)
 			return pError;
 	}
@@ -1061,7 +1060,7 @@ void CClient::ProcessConnlessPacket(CNetChunk *pPacket)
 		{
 			int Size = pPacket->m_DataSize-sizeof(VERSIONSRV_MAPLIST);
 			int Num = Size/sizeof(CMapVersion);
-			m_MapChecker.AddMaplist((CMapVersion *)((char*)pPacket->m_pData+sizeof(VERSIONSRV_MAPLIST)), Num);
+			m_pMapChecker->AddMaplist((CMapVersion *)((char*)pPacket->m_pData+sizeof(VERSIONSRV_MAPLIST)), Num);
 		}
 	}
 
@@ -1161,7 +1160,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 			const char *pError = 0;
 
 			// check for valid standard map
-			if(!m_MapChecker.IsMapValid(pMap, pMapSha256, MapCrc, MapSize))
+			if(!m_pMapChecker->IsMapValid(pMap, pMapSha256, MapCrc, MapSize))
 				pError = "invalid standard map";
 
 			// protect the player from nasty map names
@@ -1226,7 +1225,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 			if(!m_MapdownloadFileTemp)
 				return;
 
-			int Size = min(m_MapDownloadChunkSize, m_MapdownloadTotalsize-m_MapdownloadAmount);
+			int Size = minimum(m_MapDownloadChunkSize, m_MapdownloadTotalsize-m_MapdownloadAmount);
 			const unsigned char *pData = Unpacker.GetRaw(Size);
 			if(Unpacker.Error())
 				return;
@@ -1409,7 +1408,6 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 					static CSnapshot Emptysnap;
 					CSnapshot *pDeltaShot = &Emptysnap;
 					int PurgeTick;
-					void *pDeltaData;
 					int DeltaSize;
 					unsigned char aTmpBuffer2[CSnapshot::MAX_SIZE];
 					unsigned char aTmpBuffer3[CSnapshot::MAX_SIZE];
@@ -1448,7 +1446,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 					}
 
 					// decompress snapshot
-					pDeltaData = m_SnapshotDelta.EmptyDelta();
+					const void *pDeltaData = m_SnapshotDelta.EmptyDelta();
 					DeltaSize = sizeof(int)*3;
 
 					if(CompleteSize)
@@ -1466,7 +1464,9 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 					SnapSize = m_SnapshotDelta.UnpackDelta(pDeltaShot, pTmpBuffer3, pDeltaData, DeltaSize);
 					if(SnapSize < 0)
 					{
-						m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client", "delta unpack failed!");
+						char aBuf[64];
+						str_format(aBuf, sizeof(aBuf), "delta unpack failed! (%d)", SnapSize);
+						m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client", aBuf);
 						return;
 					}
 
@@ -1528,9 +1528,9 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 					if(m_ReceivedSnapshots == 2)
 					{
 						// start at 200ms and work from there
-						m_PredictedTime.Init(GameTick*time_freq()/50);
+						m_PredictedTime.Init(GameTick * time_freq() / SERVER_TICK_SPEED);
 						m_PredictedTime.SetAdjustSpeed(1, 1000.0f);
-						m_GameTime.Init((GameTick-1)*time_freq()/50);
+						m_GameTime.Init((GameTick - 1) * time_freq() / SERVER_TICK_SPEED);
 						m_aSnapshots[SNAP_PREV] = m_SnapshotStorage.m_pFirst;
 						m_aSnapshots[SNAP_CURRENT] = m_SnapshotStorage.m_pLast;
 						SetState(IClient::STATE_ONLINE);
@@ -1540,9 +1540,9 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 					if(m_ReceivedSnapshots > 2)
 					{
 						int64 Now = m_GameTime.Get(time_get());
-						int64 TickStart = GameTick*time_freq()/50;
+						int64 TickStart = GameTick * time_freq() / SERVER_TICK_SPEED;
 						int64 TimeLeft = (TickStart-Now)*1000 / time_freq();
-						m_GameTime.Update(&m_GametimeMarginGraph, (GameTick-1)*time_freq()/50, TimeLeft, 0);
+						m_GameTime.Update(&m_GametimeMarginGraph, (GameTick - 1) * time_freq() / SERVER_TICK_SPEED, TimeLeft, 0);
 					}
 
 					// ack snapshot
@@ -1674,7 +1674,7 @@ void CClient::Update()
 		while(1)
 		{
 			CSnapshotStorage::CHolder *pCur = m_aSnapshots[SNAP_CURRENT];
-			int64 TickStart = (pCur->m_Tick)*time_freq()/50;
+			int64 TickStart = (pCur->m_Tick) * Freq / SERVER_TICK_SPEED;
 
 			if(TickStart < Now)
 			{
@@ -1703,22 +1703,22 @@ void CClient::Update()
 
 		if(m_aSnapshots[SNAP_CURRENT] && m_aSnapshots[SNAP_PREV])
 		{
-			int64 CurtickStart = (m_aSnapshots[SNAP_CURRENT]->m_Tick)*time_freq()/50;
-			int64 PrevtickStart = (m_aSnapshots[SNAP_PREV]->m_Tick)*time_freq()/50;
-			int PrevPredTick = (int)(PredNow*50/time_freq());
+			int64 CurtickStart = m_aSnapshots[SNAP_CURRENT]->m_Tick * Freq / SERVER_TICK_SPEED;
+			int64 PrevtickStart = m_aSnapshots[SNAP_PREV]->m_Tick * Freq / SERVER_TICK_SPEED;
+			int PrevPredTick = (int)(PredNow * SERVER_TICK_SPEED / Freq);
 			int NewPredTick = PrevPredTick+1;
 
 			m_GameIntraTick = (Now - PrevtickStart) / (float)(CurtickStart-PrevtickStart);
-			m_GameTickTime = (Now - PrevtickStart) / (float)Freq; //(float)SERVER_TICK_SPEED);
+			m_GameTickTime = (Now - PrevtickStart) / (float)Freq;
 
-			CurtickStart = NewPredTick*time_freq()/50;
-			PrevtickStart = PrevPredTick*time_freq()/50;
+			CurtickStart = NewPredTick * Freq / SERVER_TICK_SPEED;
+			PrevtickStart = PrevPredTick * Freq / SERVER_TICK_SPEED;
 			m_PredIntraTick = (PredNow - PrevtickStart) / (float)(CurtickStart-PrevtickStart);
 
 			if(NewPredTick < m_aSnapshots[SNAP_PREV]->m_Tick-SERVER_TICK_SPEED || NewPredTick > m_aSnapshots[SNAP_PREV]->m_Tick+SERVER_TICK_SPEED)
 			{
 				m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client", "prediction time reset!");
-				m_PredictedTime.Init(m_aSnapshots[SNAP_CURRENT]->m_Tick*time_freq()/50);
+				m_PredictedTime.Init(m_aSnapshots[SNAP_CURRENT]->m_Tick * Freq / SERVER_TICK_SPEED);
 			}
 
 			if(NewPredTick > m_PredTick)
@@ -1734,7 +1734,7 @@ void CClient::Update()
 		// only do sane predictions
 		if(Repredict)
 		{
-			if(m_PredTick > m_CurGameTick && m_PredTick < m_CurGameTick+50)
+			if(m_PredTick > m_CurGameTick && m_PredTick < m_CurGameTick + SERVER_TICK_SPEED)
 				GameClient()->OnPredict();
 		}
 	}
@@ -1771,8 +1771,7 @@ void CClient::Update()
 	MasterServer()->Update();
 
 	// update the server browser
-	m_ServerBrowser.Update(m_ResortServerBrowser);
-	m_ResortServerBrowser = false;
+	m_ServerBrowser.Update();
 
 	// update gameclient
 	if(!m_EditorActive)
@@ -1833,6 +1832,7 @@ void CClient::InitInterfaces()
 	m_pGameClient = Kernel()->RequestInterface<IGameClient>();
 	m_pInput = Kernel()->RequestInterface<IEngineInput>();
 	m_pMap = Kernel()->RequestInterface<IEngineMap>();
+	m_pMapChecker = Kernel()->RequestInterface<IMapChecker>();
 	m_pMasterServer = Kernel()->RequestInterface<IEngineMasterServer>();
 	m_pConfigManager = Kernel()->RequestInterface<IConfigManager>();
 	m_pConfig = m_pConfigManager->Values();
@@ -1842,6 +1842,8 @@ void CClient::InitInterfaces()
 	m_ServerBrowser.Init(&m_ContactClient, m_pGameClient->NetVersion());
 	m_Friends.Init();
 	m_Blacklist.Init();
+	m_DemoRecorder.Init(Console(), m_pStorage);
+	m_DemoPlayer.Init(Console(), m_pStorage);
 }
 
 bool CClient::LimitFps()
@@ -1940,8 +1942,6 @@ void CClient::Run()
 		atexit(SDL_Quit); // ignore_convention
 	}
 
-	m_MenuStartTime = time_get();
-
 	// init graphics
 	{
 		m_pGraphics = CreateEngineGraphicsThreaded();
@@ -1988,7 +1988,7 @@ void CClient::Run()
 	}
 
 	// init font rendering
-	Kernel()->RequestInterface<IEngineTextRender>()->Init();
+	m_pTextRender->Init();
 
 	// init the input
 	Input()->Init();
@@ -2145,14 +2145,6 @@ void CClient::Run()
 		if(State() == IClient::STATE_QUITING)
 			break;
 
-		// menu tick
-		if(State() == IClient::STATE_OFFLINE)
-		{
-			int64 t = time_get();
-			while(t > TickStartTime(m_CurMenuTick+1))
-				m_CurMenuTick++;
-		}
-
 		// beNice
 		if(Config()->m_ClCpuThrottle)
 			thread_sleep(Config()->m_ClCpuThrottle);
@@ -2196,14 +2188,12 @@ void CClient::Run()
 	m_ServerBrowser.SaveServerlist();
 
 	// shutdown SDL
-	{
-		SDL_Quit();
-	}
+	SDL_Quit();
 }
 
 int64 CClient::TickStartTime(int Tick)
 {
-	return m_MenuStartTime + (time_freq()*Tick)/m_GameTickSpeed;
+	return m_LocalStartTime + (time_freq()*Tick)/m_GameTickSpeed;
 }
 
 void CClient::Con_Connect(IConsole::IResult *pResult, void *pUserData)
@@ -2307,7 +2297,7 @@ const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)
 	// try to start playback
 	m_DemoPlayer.SetListener(this);
 
-	const char *pError = m_DemoPlayer.Load(Storage(), m_pConsole, pFilename, StorageType, GameClient()->NetVersion());
+	const char *pError = m_DemoPlayer.Load(pFilename, StorageType, GameClient()->NetVersion());
 	if(pError)
 		return pError;
 
@@ -2362,7 +2352,7 @@ void CClient::DemoRecorder_Start(const char *pFilename, bool WithTimestamp)
 		}
 		else
 			str_format(aFilename, sizeof(aFilename), "demos/%s.demo", pFilename);
-		m_DemoRecorder.Start(Storage(), m_pConsole, aFilename, GameClient()->NetVersion(), m_aCurrentMap, m_CurrentMapSha256, m_CurrentMapCrc, "client");
+		m_DemoRecorder.Start(aFilename, GameClient()->NetVersion(), m_aCurrentMap, m_CurrentMapSha256, m_CurrentMapCrc, "client");
 	}
 }
 
@@ -2381,9 +2371,10 @@ void CClient::DemoRecorder_HandleAutoStart()
 	}
 }
 
-void CClient::DemoRecorder_Stop()
+void CClient::DemoRecorder_Stop(bool ErrorIfNotRecording)
 {
-	m_DemoRecorder.Stop();
+	if(ErrorIfNotRecording || m_DemoRecorder.IsRecording())
+		m_DemoRecorder.Stop();
 }
 
 void CClient::DemoRecorder_AddDemoMarker()
@@ -2403,7 +2394,7 @@ void CClient::Con_Record(IConsole::IResult *pResult, void *pUserData)
 void CClient::Con_StopRecord(IConsole::IResult *pResult, void *pUserData)
 {
 	CClient *pSelf = (CClient *)pUserData;
-	pSelf->DemoRecorder_Stop();
+	pSelf->DemoRecorder_Stop(true);
 }
 
 void CClient::Con_AddDemoMarker(IConsole::IResult *pResult, void *pUserData)
@@ -2414,7 +2405,7 @@ void CClient::Con_AddDemoMarker(IConsole::IResult *pResult, void *pUserData)
 
 void CClient::ServerBrowserUpdate()
 {
-	m_ResortServerBrowser = true;
+	m_ServerBrowser.RequestResort();
 }
 
 void CClient::ConchainServerBrowserUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
@@ -2541,7 +2532,7 @@ void CClient::RegisterCommands()
 
 static CClient *CreateClient()
 {
-	CClient *pClient = static_cast<CClient *>(mem_alloc(sizeof(CClient), 1));
+	CClient *pClient = static_cast<CClient *>(mem_alloc(sizeof(CClient)));
 	mem_zero(pClient, sizeof(CClient));
 	return new(pClient) CClient;
 }
@@ -2573,6 +2564,7 @@ extern "C" int TWMain(int argc, const char **argv) // ignore_convention
 int main(int argc, const char **argv) // ignore_convention
 #endif
 {
+	cmdline_fix(&argc, &argv);
 #if defined(CONF_FAMILY_WINDOWS)
 	bool QuickEditMode = false;
 	for(int i = 1; i < argc; i++) // ignore_convention
@@ -2611,6 +2603,7 @@ int main(int argc, const char **argv) // ignore_convention
 	IEngineInput *pEngineInput = CreateEngineInput();
 	IEngineTextRender *pEngineTextRender = CreateEngineTextRender();
 	IEngineMap *pEngineMap = CreateEngineMap();
+	IMapChecker *pMapChecker = CreateMapChecker();
 	IEngineMasterServer *pEngineMasterServer = CreateEngineMasterServer();
 
 	if(RandInitFailed)
@@ -2637,6 +2630,8 @@ int main(int argc, const char **argv) // ignore_convention
 
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineMap*>(pEngineMap)); // register as both
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IMap*>(pEngineMap));
+
+		RegisterFail = RegisterFail || !pKernel->RegisterInterface(pMapChecker);
 
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineMasterServer*>(pEngineMasterServer)); // register as both
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IMasterServer*>(pEngineMasterServer));
@@ -2717,6 +2712,9 @@ int main(int argc, const char **argv) // ignore_convention
 	dbg_msg("client", "starting...");
 	pClient->Run();
 
+	// wait for background jobs to finish
+	pEngine->ShutdownJobs();
+
 	// write down the config and quit
 	pConfigManager->Save();
 
@@ -2725,6 +2723,7 @@ int main(int argc, const char **argv) // ignore_convention
 		dbg_console_cleanup();
 #endif
 	// free components
+	pClient->~CClient();
 	mem_free(pClient);
 	delete pKernel;
 	delete pEngine;
@@ -2735,7 +2734,10 @@ int main(int argc, const char **argv) // ignore_convention
 	delete pEngineInput;
 	delete pEngineTextRender;
 	delete pEngineMap;
+	delete pMapChecker;
 	delete pEngineMasterServer;
 
+	secure_random_uninit();
+	cmdline_free(argc, argv);
 	return 0;
 }

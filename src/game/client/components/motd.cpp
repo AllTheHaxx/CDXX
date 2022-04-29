@@ -36,8 +36,8 @@ void CMotd::OnRender()
 	if(!IsActive())
 		return;
 
-	const float Width = 400*3.0f*Graphics()->ScreenAspect();
-	const float Height = 400*3.0f;
+	const float Height = 400.0f * 3.0f;
+	const float Width = Height * Graphics()->ScreenAspect();
 
 	Graphics()->MapScreen(0, 0, Width, Height);
 
@@ -51,7 +51,7 @@ void CMotd::OnRender()
 	CUIRect Rect = {x, y, w, h};
 
 	Graphics()->BlendNormal();
-	RenderTools()->DrawRoundRect(&Rect, vec4(0.0f, 0.0f, 0.0f, 0.5f), 30.0f);
+	Rect.Draw(vec4(0.0f, 0.0f, 0.0f, 0.5f), 30.0f);
 
 	Rect.Margin(25.0f, &Rect);
 

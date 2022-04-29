@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest, ubuntu-16.04]
+        os: [ubuntu-latest, macOS-latest, windows-latest, ubuntu-18.04]
         include:
         - os: ubuntu-latest
           cmake-args: -G "Unix Makefiles"
@@ -16,7 +16,7 @@ jobs:
           env:
             CFLAGS: -Wdeclaration-after-statement -Werror
             CXXFLAGS: -Werror
-        - os: ubuntu-16.04
+        - os: ubuntu-18.04
           cmake-path: /usr/bin/
           cmake-args: -G "Unix Makefiles"
           package-file: teeworlds-*-linux_x86_64.tar.xz
@@ -31,7 +31,7 @@ jobs:
             CFLAGS: -Wdeclaration-after-statement -Werror
             CXXFLAGS: -Werror
         - os: windows-latest
-          cmake-args: -G "Visual Studio 16 2019" -A x64
+          cmake-args: -A x64
           package-file: teeworlds-*-win64.zip
           env:
             CFLAGS: /WX
@@ -67,6 +67,10 @@ jobs:
       run: |
         cd debug
         ${{ matrix.cmake-path }}cmake --build . --config Debug ${{ matrix.build-args }} --target run_tests
+    - name: Run debug server
+      env: ${{ matrix.env }}
+      run: |
+        cd debug
         ./teeworlds_srv shutdown
 
     - name: Build in release mode
@@ -80,6 +84,10 @@ jobs:
       run: |
         cd release
         ${{ matrix.cmake-path }}cmake --build . --config Release ${{ matrix.build-args }} --target run_tests
+    - name: Run release server
+      env: ${{ matrix.env }}
+      run: |
+        cd release
         ./teeworlds_srv shutdown
 
     - name: Package
@@ -110,7 +118,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: matricks/bam
-        ref: 07fbb5543c692f6b9a7f09e48c64e2368349a3a8
+        ref: 8cd08744c37666830d439ab54016c9d228c63b68
         path: ./bam
 
     - name: Prepare Linux
